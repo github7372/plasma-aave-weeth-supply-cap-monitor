@@ -2,13 +2,8 @@ name: Plasma Aave Monitor
 
 on:
   schedule:
-    # Run every 5 minutes
     - cron: '*/5 * * * *'
-  
-  # Allow manual triggering
   workflow_dispatch:
-
-  # Run on push for testing
   push:
     branches: [ main ]
 
@@ -31,7 +26,7 @@ jobs:
         EMAIL_TO: ${{ secrets.EMAIL_TO }}
         EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
         EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-      run: node monitor.js
+      run: node ./monitor.js  # <- ensure this path points to the actual location of monitor.js
       
     - name: Send Email Alert
       if: steps.monitor.outputs.alert == 'true'
