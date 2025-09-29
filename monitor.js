@@ -1,13 +1,12 @@
 const { ethers } = require('ethers');
 const fs = require('fs');
+const path = require('path');
 
 // Configuration
 const RPC_URL = 'https://rpc.plasma.to';
 const WEETH_ADDRESS = '0xAf1a7a488c8348b41d5860C04162af7d3D38A996';
-const ABI = [
-  "function totalSupply() view returns (uint256)"
-];
-const DATA_FILE = 'previous_data.json';
+const ABI = ["function totalSupply() view returns (uint256)"];
+const DATA_FILE = path.join(__dirname, 'previous_data.json');
 
 // Initialize provider and contract
 const provider = new ethers.JsonRpcProvider(RPC_URL);
@@ -22,7 +21,7 @@ function loadPreviousData() {
   } catch (error) {
     console.log('📝 No previous data found, starting fresh');
   }
-  return { lastCheck: null, totalSupply: null };
+  return null;
 }
 
 // Save current data
@@ -42,28 +41,36 @@ function triggerEmailAlert(message) {
   console.log(`::set-output name=timestamp::${new Date().toISOString()}`);
 }
 
+// Get totalSupply from contract
 async function getWeETHTotalSupply() {
-  try {
-    const totalSupply = await contract.totalSupply();
-    console.log('weETH totalSupply:', ethers.formatUnits(totalSupply, 18));
-    return totalSupply;
-  } catch (error) {
-    console.error('Error fetching totalSupply:', error);
-    throw error;
-  }
+  const totalSupply = await contract.totalSupply();
+  console.log('weETH totalSupply:', ethers.formatUnits(totalSupply, 18));
+  return totalSupply;
 }
 
+// Main monitor function
 async function runMonitor() {
   const previousData = loadPreviousData();
   const currentSupply = await getWeETHTotalSupply();
 
-  // Compare with previous data and trigger alert if necessary
-  if (previousData.totalSupply && !previousData.totalSupply.eq(currentSupply)) {
-    triggerEmailAlert(`weETH supply changed! Old: ${previousData.totalSupply}, New: ${currentSupply}`);
+  if (!previousData) {
+    // First run
+    triggerEmailAlert(`Plasma Aave Monitor started! Current weETH totalSupply: ${ethers.formatUnits(currentSupply, 18)}`);
+  } else if (previousData.totalSupply && previousData.totalSupply !== currentSupply.toString()) {
+    // Supply changed
+    triggerEmailAlert(`weETH supply changed! Old: ${previousData.totalSupply}, New: ${currentSupply.toString()}`);
+  } else {
+    // No change
+    console.log('😴 No change detected in weETH totalSupply');
+    console.log(`::set-output name=alert::false`);
   }
 
   // Save current state
-  savePreviousData({ ...previousData, totalSupply: currentSupply.toString() });
+  savePreviousData({ lastCheck: new Date().toISOString(), totalSupply: currentSupply.toString() });
 }
 
-runMonitor().catch(console.error);
+runMonitor().catch(error => {
+  console.error('💥 Monitor failed:', error);
+  triggerEmailAlert(`Critical error in monitor: ${error.message}`);
+  process.exit(1);
+});
