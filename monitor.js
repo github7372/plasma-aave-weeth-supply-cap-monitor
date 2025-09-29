@@ -4,41 +4,42 @@ const path = require('path');
 
 // Configuration
 const RPC_URL = 'https://rpc.plasma.to';
-const CONTRACT_ADDRESS = '0xAf1a7a488c8348b41d5860C04162af7d3D38A996'; // Aave contract
-const WEETH_ADDRESS = '0xA3D68b74bF0528fdD07263c60d6488749044914b';
-const ABI = ["function totalSupply() view returns (uint256)"];
-
-// Save file in GitHub workspace
+const AAVE_CONTRACT = '0xAf1a7a488c8348b41d5860C04162af7d3D38A996';
 const DATA_FILE = path.join(process.env.GITHUB_WORKSPACE || '.', 'previous_data.json');
+
+// Minimal ABI with totalSupply() read method
+const ABI = [
+  "function totalSupply() view returns (uint256)"
+];
 
 // Provider & Contract
 const provider = new ethers.JsonRpcProvider(RPC_URL);
-const contract = new ethers.Contract(WEETH_ADDRESS, ABI, provider);
+const contract = new ethers.Contract(AAVE_CONTRACT, ABI, provider);
 
 // Load previous data
 function loadPreviousData() {
-  try {
-    if (fs.existsSync(DATA_FILE)) {
+  if (fs.existsSync(DATA_FILE)) {
+    try {
       return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    } catch (err) {
+      console.log('⚠️ Failed to read previous_data.json, starting fresh');
     }
-  } catch (error) {
-    console.log('📝 No previous data found, starting fresh');
   }
   return null;
 }
 
-// Save data
+// Save current data
 function savePreviousData(data) {
   try {
     fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-    console.log('💾 Saved current data to previous_data.json');
-  } catch (error) {
-    console.error('❌ Failed to save data:', error.message);
+    console.log('💾 Saved data to previous_data.json');
+  } catch (err) {
+    console.error('❌ Failed to save previous_data.json:', err.message);
   }
 }
 
-// Alert function
-function triggerEmailAlert(message) {
+// GitHub Actions output helpers
+function triggerAlert(message) {
   console.log('🚨 ALERT:', message);
   const githubOutput = process.env.GITHUB_OUTPUT;
   if (githubOutput) {
@@ -48,40 +49,35 @@ function triggerEmailAlert(message) {
   }
 }
 
-// No alert
-function setNoAlert() {
+function clearAlert() {
   const githubOutput = process.env.GITHUB_OUTPUT;
   if (githubOutput) {
     fs.appendFileSync(githubOutput, `alert=false\n`);
   }
 }
 
-// Get totalSupply
-async function getWeETHTotalSupply() {
-  const totalSupply = await contract.totalSupply();
-  console.log('weETH totalSupply:', ethers.formatUnits(totalSupply, 18));
-  return totalSupply;
-}
-
-// Main
+// Main monitor
 async function runMonitor() {
-  const previousData = loadPreviousData();
-  const currentSupply = await getWeETHTotalSupply();
+  const previous = loadPreviousData();
 
-  if (!previousData) {
-    triggerEmailAlert(`Plasma Aave Monitor started! Current weETH totalSupply: ${ethers.formatUnits(currentSupply, 18)}`);
-  } else if (previousData.totalSupply && previousData.totalSupply !== currentSupply.toString()) {
-    triggerEmailAlert(`weETH supply changed! Old: ${previousData.totalSupply}, New: ${currentSupply.toString()}`);
+  const currentValue = await contract.totalSupply();
+  const formatted = ethers.formatUnits(currentValue, 18); // Assuming 18 decimals
+  console.log(`Aave Contract totalSupply: ${formatted}`);
+
+  if (!previous) {
+    triggerAlert(`First run: totalSupply = ${formatted}`);
+  } else if (previous.totalSupply !== currentValue.toString()) {
+    triggerAlert(`totalSupply changed! Old: ${previous.totalSupply}, New: ${currentValue.toString()}`);
   } else {
     console.log('😴 No change detected');
-    setNoAlert();
+    clearAlert();
   }
 
-  savePreviousData({ lastCheck: new Date().toISOString(), totalSupply: currentSupply.toString() });
+  savePreviousData({ lastCheck: new Date().toISOString(), totalSupply: currentValue.toString() });
 }
 
-runMonitor().catch(error => {
-  console.error('💥 Monitor failed:', error);
-  triggerEmailAlert(`Critical error in monitor: ${error.message}`);
+runMonitor().catch(err => {
+  console.error('💥 Monitor failed:', err);
+  triggerAlert(`Critical error: ${err.message}`);
   process.exit(1);
 });
