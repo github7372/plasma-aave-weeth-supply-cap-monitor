@@ -13,6 +13,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -52,4 +55,4 @@ jobs:
           git config --local user.name "GitHub Action"
           git add previous_data.json
           git diff --staged --quiet || git commit -m "Update monitor data [$(date)]"
-          git push || echo "No changes to push"
+          git push
