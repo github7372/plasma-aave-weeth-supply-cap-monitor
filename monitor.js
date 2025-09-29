@@ -3,7 +3,7 @@ const fs = require('fs');
 
 // Configuration
 const RPC_URL = 'https://rpc.plasma.to';
-const WEETH_ADDRESS = '0xA3D68b74bF0528fdD07263c60d6488749044914b';
+const WEETH_ADDRESS = '0xAf1a7a488c8348b41d5860C04162af7d3D38A996';
 const ABI = [
   "function totalSupply() view returns (uint256)"
 ];
