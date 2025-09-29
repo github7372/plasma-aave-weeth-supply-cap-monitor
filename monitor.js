@@ -159,4 +159,20 @@ async function checkForSupplyCapIndicators(pageContent, previousData) {
 async function runMonitor() {
   console.log('🚀 Starting Plasma Aave Monitor...');
   console.log(`📋 Monitoring contract: ${CONTRACT_ADDRESS}`);
-  console.log(`🎯 Watching weETH: ${WEETH_ADDRESS_
+  console.log(`🎯 Watching weETH: ${WEETH_ADDRESS}`);
+  console.log(`⏰ Check time: ${new Date().toISOString()}`);
+
+  setGitHubOutput('alert', 'false');
+  setGitHubOutput('message', '');
+  setGitHubOutput('timestamp', new Date().toISOString());
+
+  await checkContractActivity();
+
+  console.log('✅ Monitor run completed');
+}
+
+runMonitor().catch(error => {
+  console.error('💥 Monitor failed:', error);
+  triggerEmailAlert(`Critical error in monitor: ${error.message}`);
+  process.exit(1);
+});
