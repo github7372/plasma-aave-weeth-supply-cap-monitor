@@ -4,11 +4,14 @@ const path = require('path');
 
 // Configuration
 const RPC_URL = 'https://rpc.plasma.to';
+const CONTRACT_ADDRESS = '0xAf1a7a488c8348b41d5860C04162af7d3D38A996'; // Aave contract
 const WEETH_ADDRESS = '0xA3D68b74bF0528fdD07263c60d6488749044914b';
 const ABI = ["function totalSupply() view returns (uint256)"];
-const DATA_FILE = path.join(__dirname, 'previous_data.json');
 
-// Initialize provider and contract
+// Save file in GitHub workspace
+const DATA_FILE = path.join(process.env.GITHUB_WORKSPACE || '.', 'previous_data.json');
+
+// Provider & Contract
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 const contract = new ethers.Contract(WEETH_ADDRESS, ABI, provider);
 
@@ -24,18 +27,19 @@ function loadPreviousData() {
   return null;
 }
 
-// Save current data
+// Save data
 function savePreviousData(data) {
   try {
     fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+    console.log('💾 Saved current data to previous_data.json');
   } catch (error) {
     console.error('❌ Failed to save data:', error.message);
   }
 }
 
-// Send alert via GitHub Actions environment file
+// Alert function
 function triggerEmailAlert(message) {
-  console.log('🚨 ALERT TRIGGERED:', message);
+  console.log('🚨 ALERT:', message);
   const githubOutput = process.env.GITHUB_OUTPUT;
   if (githubOutput) {
     fs.appendFileSync(githubOutput, `alert=true\n`);
@@ -44,7 +48,7 @@ function triggerEmailAlert(message) {
   }
 }
 
-// Write false alert to GitHub Actions environment file
+// No alert
 function setNoAlert() {
   const githubOutput = process.env.GITHUB_OUTPUT;
   if (githubOutput) {
@@ -52,30 +56,27 @@ function setNoAlert() {
   }
 }
 
-// Get totalSupply from contract
+// Get totalSupply
 async function getWeETHTotalSupply() {
   const totalSupply = await contract.totalSupply();
   console.log('weETH totalSupply:', ethers.formatUnits(totalSupply, 18));
   return totalSupply;
 }
 
-// Main monitor function
+// Main
 async function runMonitor() {
   const previousData = loadPreviousData();
   const currentSupply = await getWeETHTotalSupply();
 
   if (!previousData) {
-    // First run, alert
     triggerEmailAlert(`Plasma Aave Monitor started! Current weETH totalSupply: ${ethers.formatUnits(currentSupply, 18)}`);
   } else if (previousData.totalSupply && previousData.totalSupply !== currentSupply.toString()) {
-    // Supply changed
     triggerEmailAlert(`weETH supply changed! Old: ${previousData.totalSupply}, New: ${currentSupply.toString()}`);
   } else {
-    console.log('😴 No change detected in weETH totalSupply');
+    console.log('😴 No change detected');
     setNoAlert();
   }
 
-  // Save current state (creates previous_data.json if missing)
   savePreviousData({ lastCheck: new Date().toISOString(), totalSupply: currentSupply.toString() });
 }
 
