@@ -5,12 +5,8 @@ const path = require('path');
 // Configuration
 const RPC_URL = 'https://rpc.plasma.to';
 const AAVE_CONTRACT = '0xAf1a7a488c8348b41d5860C04162af7d3D38A996';
+const ABI = ["function totalSupply() view returns (uint256)"];
 const DATA_FILE = path.join(process.env.GITHUB_WORKSPACE || '.', 'previous_data.json');
-
-// Minimal ABI with totalSupply() read method
-const ABI = [
-  "function totalSupply() view returns (uint256)"
-];
 
 // Provider & Contract
 const provider = new ethers.JsonRpcProvider(RPC_URL);
@@ -28,7 +24,7 @@ function loadPreviousData() {
   return null;
 }
 
-// Save current data
+// Save data
 function savePreviousData(data) {
   try {
     fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
@@ -38,7 +34,7 @@ function savePreviousData(data) {
   }
 }
 
-// GitHub Actions output helpers
+// GitHub Actions outputs
 function triggerAlert(message) {
   console.log('🚨 ALERT:', message);
   const githubOutput = process.env.GITHUB_OUTPUT;
@@ -56,24 +52,29 @@ function clearAlert() {
   }
 }
 
+// Get totalSupply
+async function getTotalSupply() {
+  const supply = await contract.totalSupply();
+  const formatted = ethers.formatUnits(supply, 18);
+  console.log(`Aave totalSupply: ${formatted}`);
+  return supply;
+}
+
 // Main monitor
 async function runMonitor() {
   const previous = loadPreviousData();
-
-  const currentValue = await contract.totalSupply();
-  const formatted = ethers.formatUnits(currentValue, 18); // Assuming 18 decimals
-  console.log(`Aave Contract totalSupply: ${formatted}`);
+  const currentSupply = await getTotalSupply();
 
   if (!previous) {
-    triggerAlert(`First run: totalSupply = ${formatted}`);
-  } else if (previous.totalSupply !== currentValue.toString()) {
-    triggerAlert(`totalSupply changed! Old: ${previous.totalSupply}, New: ${currentValue.toString()}`);
+    triggerAlert(`First run: totalSupply = ${ethers.formatUnits(currentSupply, 18)}`);
+  } else if (previous.totalSupply !== currentSupply.toString()) {
+    triggerAlert(`totalSupply changed! Old: ${previous.totalSupply}, New: ${currentSupply.toString()}`);
   } else {
     console.log('😴 No change detected');
     clearAlert();
   }
 
-  savePreviousData({ lastCheck: new Date().toISOString(), totalSupply: currentValue.toString() });
+  savePreviousData({ lastCheck: new Date().toISOString(), totalSupply: currentSupply.toString() });
 }
 
 runMonitor().catch(err => {
