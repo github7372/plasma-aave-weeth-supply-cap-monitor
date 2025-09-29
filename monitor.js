@@ -24,7 +24,7 @@ function loadPreviousData() {
   return null;
 }
 
-// Save data
+// Save current data
 function savePreviousData(data) {
   try {
     fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
@@ -60,7 +60,7 @@ async function getTotalSupply() {
   return supply;
 }
 
-// Main monitor
+// Main
 async function runMonitor() {
   const previous = loadPreviousData();
   const currentSupply = await getTotalSupply();
