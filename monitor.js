@@ -61,7 +61,6 @@ async function checkContractActivity() {
   try {
     console.log('🔍 Checking contract activity...');
     
-    // Method 1: Check contract transactions page
     const txPageUrl = `https://plasmascan.to/address/${CONTRACT_ADDRESS}`;
     
     const response = await makeRequest(txPageUrl, {
@@ -70,42 +69,38 @@ async function checkContractActivity() {
       }
     });
 
+    if (response.status === 202) {
+      console.log('⚠️ Page not ready yet (HTTP 202), skipping check.');
+      setGitHubOutput('alert', 'false');
+      return;
+    }
+
     if (response.status !== 200) {
       throw new Error(`HTTP ${response.status}`);
     }
 
     const pageContent = response.data;
-    
-    // Create a hash of relevant page content
     const currentHash = Buffer.from(pageContent.substring(0, 2000)).toString('base64').substring(0, 30);
-    
     const previousData = loadPreviousData();
-    
-    // Check if page has changed (indicating new transactions)
+
     if (previousData.pageHash && previousData.pageHash !== currentHash) {
       console.log('📈 New activity detected!');
-      
-      // Look for weETH-related activity
       const hasWeETHActivity = pageContent.toLowerCase().includes(WEETH_ADDRESS.toLowerCase());
-      
       if (hasWeETHActivity) {
-        triggerEmailAlert(`New weETH activity detected on Aave contract! Large deposits or withdrawals may have occurred. Check: ${txPageUrl}`);
+        triggerEmailAlert(`New weETH activity detected on Aave contract! Check: ${txPageUrl}`);
       } else {
         triggerEmailAlert(`New contract activity detected on Aave Plasma! Check: ${txPageUrl}`);
       }
-      
     } else if (!previousData.pageHash) {
       console.log('📝 First run - baseline established');
-      triggerEmailAlert('Plasma Aave Monitor successfully started! You will be notified of any weETH supply changes.');
+      triggerEmailAlert('Plasma Aave Monitor started! You will be notified of weETH supply changes.');
     } else {
       console.log('😴 No new activity detected');
       setGitHubOutput('alert', 'false');
     }
-    
-    // Look for specific indicators of supply cap changes
+
     await checkForSupplyCapIndicators(pageContent, previousData);
-    
-    // Save current state
+
     savePreviousData({
       ...previousData,
       pageHash: currentHash,
@@ -116,13 +111,11 @@ async function checkContractActivity() {
 
   } catch (error) {
     console.error('❌ Error checking contract:', error.message);
-    
     const previousData = loadPreviousData();
     const now = new Date();
     const lastErrorAlert = previousData.lastErrorAlert ? new Date(previousData.lastErrorAlert) : null;
-    
-    // Only send error alert if it's been more than 2 hours since last error alert
-    if (!lastErrorAlert || (now - lastErrorAlert) > 7200000) {
+
+    if (!lastErrorAlert || (now - lastErrorAlert) > 7200000) { // 2 hours
       triggerEmailAlert(`Monitor encountered an error: ${error.message}. Will keep trying automatically.`);
       savePreviousData({
         ...previousData,
@@ -137,38 +130,28 @@ async function checkContractActivity() {
 // Check for supply cap related indicators
 async function checkForSupplyCapIndicators(pageContent, previousData) {
   try {
-    // Look for large transaction amounts in the page
-    const largeAmountPatterns = [
+    const patterns = [
       /[\d,]+\.?\d*\s*(weETH|WETH|ETH)/gi,
-      /\$[\d,]+\.?\d*[kmb]?/gi, // Dollar amounts
-      /[\d,]+\.?\d*\s*tokens?/gi // Token amounts
+      /\$[\d,]+\.?\d*[kmb]?/gi,
+      /[\d,]+\.?\d*\s*tokens?/gi
     ];
-    
-    let foundLargeAmounts = [];
-    
-    largeAmountPatterns.forEach(pattern => {
-      const matches = pageContent.match(pattern) || [];
-      foundLargeAmounts = foundLargeAmounts.concat(matches.slice(0, 3)); // Limit to prevent spam
+
+    let foundAmounts = [];
+    patterns.forEach(p => {
+      const matches = pageContent.match(p) || [];
+      foundAmounts = foundAmounts.concat(matches.slice(0, 3));
     });
-    
-    if (foundLargeAmounts.length > 0 && foundLargeAmounts.some(amount => {
-      const num = parseFloat(amount.replace(/[^\d.]/g, ''));
-      return num > 1000; // Alert for amounts over 1000
-    })) {
-      
-      const previousLargeAmounts = previousData.largeAmounts || [];
-      const newAmounts = foundLargeAmounts.filter(amount => !previousLargeAmounts.includes(amount));
-      
+
+    if (foundAmounts.length > 0 && foundAmounts.some(a => parseFloat(a.replace(/[^\d.]/g, '')) > 1000)) {
+      const previousAmounts = previousData.largeAmounts || [];
+      const newAmounts = foundAmounts.filter(a => !previousAmounts.includes(a));
       if (newAmounts.length > 0) {
         triggerEmailAlert(`Large transaction amounts detected: ${newAmounts.join(', ')}. This may indicate significant weETH deposits or supply cap changes.`);
       }
-      
-      // Update stored amounts
-      previousData.largeAmounts = foundLargeAmounts;
+      previousData.largeAmounts = foundAmounts;
     }
-    
   } catch (error) {
-    console.log('⚠️ Supply cap indicator check failed:', error.message);
+    console.log('⚠️ Supply cap check failed:', error.message);
   }
 }
 
@@ -176,22 +159,4 @@ async function checkForSupplyCapIndicators(pageContent, previousData) {
 async function runMonitor() {
   console.log('🚀 Starting Plasma Aave Monitor...');
   console.log(`📋 Monitoring contract: ${CONTRACT_ADDRESS}`);
-  console.log(`🎯 Watching weETH: ${WEETH_ADDRESS}`);
-  console.log(`⏰ Check time: ${new Date().toISOString()}`);
-  
-  // Initialize outputs
-  setGitHubOutput('alert', 'false');
-  setGitHubOutput('message', '');
-  setGitHubOutput('timestamp', new Date().toISOString());
-  
-  await checkContractActivity();
-  
-  console.log('✅ Monitor run completed');
-}
-
-// Run the monitor
-runMonitor().catch(error => {
-  console.error('💥 Monitor failed:', error);
-  triggerEmailAlert(`Critical error in monitor: ${error.message}`);
-  process.exit(1);
-});
+  console.log(`🎯 Watching weETH: ${WEETH_ADDRESS_
