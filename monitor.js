@@ -4,7 +4,7 @@ const path = require('path');
 
 // Configuration
 const RPC_URL = 'https://rpc.plasma.to';
-const WEETH_ADDRESS = '0xAf1a7a488c8348b41d5860C04162af7d3D38A996';
+const WEETH_ADDRESS = '0xA3D68b74bF0528fdD07263c60d6488749044914b';
 const ABI = ["function totalSupply() view returns (uint256)"];
 const DATA_FILE = path.join(__dirname, 'previous_data.json');
 
@@ -33,12 +33,23 @@ function savePreviousData(data) {
   }
 }
 
-// Send alert via GitHub Actions output
+// Send alert via GitHub Actions environment file
 function triggerEmailAlert(message) {
   console.log('🚨 ALERT TRIGGERED:', message);
-  console.log(`::set-output name=alert::true`);
-  console.log(`::set-output name=message::${message}`);
-  console.log(`::set-output name=timestamp::${new Date().toISOString()}`);
+  const githubOutput = process.env.GITHUB_OUTPUT;
+  if (githubOutput) {
+    fs.appendFileSync(githubOutput, `alert=true\n`);
+    fs.appendFileSync(githubOutput, `message=${message}\n`);
+    fs.appendFileSync(githubOutput, `timestamp=${new Date().toISOString()}\n`);
+  }
+}
+
+// Write false alert to GitHub Actions environment file
+function setNoAlert() {
+  const githubOutput = process.env.GITHUB_OUTPUT;
+  if (githubOutput) {
+    fs.appendFileSync(githubOutput, `alert=false\n`);
+  }
 }
 
 // Get totalSupply from contract
@@ -54,18 +65,17 @@ async function runMonitor() {
   const currentSupply = await getWeETHTotalSupply();
 
   if (!previousData) {
-    // First run
+    // First run, alert
     triggerEmailAlert(`Plasma Aave Monitor started! Current weETH totalSupply: ${ethers.formatUnits(currentSupply, 18)}`);
   } else if (previousData.totalSupply && previousData.totalSupply !== currentSupply.toString()) {
     // Supply changed
     triggerEmailAlert(`weETH supply changed! Old: ${previousData.totalSupply}, New: ${currentSupply.toString()}`);
   } else {
-    // No change
     console.log('😴 No change detected in weETH totalSupply');
-    console.log(`::set-output name=alert::false`);
+    setNoAlert();
   }
 
-  // Save current state
+  // Save current state (creates previous_data.json if missing)
   savePreviousData({ lastCheck: new Date().toISOString(), totalSupply: currentSupply.toString() });
 }
 
