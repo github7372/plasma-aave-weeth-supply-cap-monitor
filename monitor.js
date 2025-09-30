@@ -67,14 +67,16 @@ async function runMonitor() {
 
   if (!previous) {
     triggerAlert(`First run: totalSupply = ${ethers.formatUnits(currentSupply, 18)}`);
+    savePreviousData({ lastCheck: new Date().toISOString(), totalSupply: currentSupply.toString() });
   } else if (previous.totalSupply !== currentSupply.toString()) {
     triggerAlert(`totalSupply changed! Old: ${previous.totalSupply}, New: ${currentSupply.toString()}`);
+    savePreviousData({ lastCheck: new Date().toISOString(), totalSupply: currentSupply.toString() });
   } else {
     console.log('😴 No change detected');
     clearAlert();
   }
 
-  savePreviousData({ lastCheck: new Date().toISOString(), totalSupply: currentSupply.toString() });
+  
 }
 
 runMonitor().catch(err => {
