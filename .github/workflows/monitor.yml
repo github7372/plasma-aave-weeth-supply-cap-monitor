@@ -47,6 +47,7 @@ jobs:
           from: ${{ secrets.EMAIL_FROM }}
           body: |
             Alert: ${{ steps.monitor.outputs.message }}
+            bridge weETH in via stargate linea->base->plasma | withdraw ETH via stargate to berachain
             Check Aave contract: https://plasmascan.to/address/0xAf1a7a488c8348b41d5860C04162af7d3D38A996
 
       - name: Commit previous_data.json
