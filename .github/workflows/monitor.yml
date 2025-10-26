@@ -1,4 +1,4 @@
-name: Plasma Aave Monitor
+name: Aave Monitor
 
 on:
   schedule:
@@ -42,13 +42,12 @@ jobs:
           server_port: 587
           username: ${{ secrets.EMAIL_FROM }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: "🚨 Plasma Aave Alert"
+          subject: "🚨 BSC Aave wstETH Supply alert (can loop as ETH borrow just 1.68% avg over last year)"
           to: ${{ secrets.EMAIL_TO }}
           from: ${{ secrets.EMAIL_FROM }}
           body: |
             Alert: ${{ steps.monitor.outputs.message }}
-            bridge weETH in via stargate linea->base->plasma | withdraw ETH via stargate to berachain
-            Check Aave contract: https://plasmascan.to/address/0xAf1a7a488c8348b41d5860C04162af7d3D38A996
+            https://app.aave.com/reserve-overview/?underlyingAsset=0x26c5e01524d2e6280a48f2c50ff6de7e52e9611c&marketName=proto_bnb_v3
 
       - name: Commit previous_data.json
         run: |
