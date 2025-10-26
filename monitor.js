@@ -3,8 +3,10 @@ const fs = require('fs');
 const path = require('path');
 
 // Configuration
-const RPC_URL = 'https://rpc.plasma.to';
-const AAVE_CONTRACT = '0xAf1a7a488c8348b41d5860C04162af7d3D38A996';
+// const RPC_URL = 'https://rpc.plasma.to';
+// const AAVE_CONTRACT = '0xAf1a7a488c8348b41d5860C04162af7d3D38A996';
+const RPC_URL = 'https://bsc-dataseed.binance.org/';
+const AAVE_CONTRACT = '0x26c5e01524d2E6280A48F2c50fF6De7e52E9611C';
 const ABI = ["function totalSupply() view returns (uint256)"];
 const DATA_FILE = path.join(process.env.GITHUB_WORKSPACE || '.', 'previous_data.json');
 
@@ -67,16 +69,14 @@ async function runMonitor() {
 
   if (!previous) {
     triggerAlert(`First run: totalSupply = ${ethers.formatUnits(currentSupply, 18)}`);
-    savePreviousData({ lastCheck: new Date().toISOString(), totalSupply: currentSupply.toString() });
   } else if (previous.totalSupply !== currentSupply.toString()) {
     triggerAlert(`totalSupply changed! Old: ${previous.totalSupply}, New: ${currentSupply.toString()}`);
-    savePreviousData({ lastCheck: new Date().toISOString(), totalSupply: currentSupply.toString() });
   } else {
     console.log('😴 No change detected');
     clearAlert();
   }
 
-  
+  savePreviousData({ lastCheck: new Date().toISOString(), totalSupply: currentSupply.toString() });
 }
 
 runMonitor().catch(err => {
