@@ -26,10 +26,16 @@ function loadPreviousData() {
   return null;
 }
 
-// Save current data
+// Save current data ONLY when it actually changed
 function savePreviousData(data) {
   try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+    const nextStr = JSON.stringify(data, null, 2);
+    const prevStr = fs.existsSync(DATA_FILE) ? fs.readFileSync(DATA_FILE, 'utf8') : null;
+    if (prevStr && prevStr === nextStr) {
+      console.log('ℹ️ No state change, not writing previous_data.json');
+      return;
+    }
+    fs.writeFileSync(DATA_FILE, nextStr);
     console.log('💾 Saved data to previous_data.json');
   } catch (err) {
     console.error('❌ Failed to save previous_data.json:', err.message);
@@ -66,17 +72,23 @@ async function getTotalSupply() {
 async function runMonitor() {
   const previous = loadPreviousData();
   const currentSupply = await getTotalSupply();
+  const currentStr = currentSupply.toString();
 
   if (!previous) {
     triggerAlert(`First run: totalSupply = ${ethers.formatUnits(currentSupply, 18)}`);
-  } else if (previous.totalSupply !== currentSupply.toString()) {
-    triggerAlert(`totalSupply changed! Old: ${previous.totalSupply}, New: ${currentSupply.toString()}`);
+    savePreviousData({ totalSupply: currentStr, firstSeen: new Date().toISOString() });
+  } else if (previous.totalSupply !== currentStr) {
+    triggerAlert(`totalSupply changed! Old: ${previous.totalSupply}, New: ${currentStr}`);
+    savePreviousData({
+      totalSupply: currentStr,
+      prevTotalSupply: previous.totalSupply,
+      lastChange: new Date().toISOString()
+    });
   } else {
     console.log('😴 No change detected');
     clearAlert();
+    // Do not write previous_data.json to avoid triggering commits
   }
-
-  savePreviousData({ lastCheck: new Date().toISOString(), totalSupply: currentSupply.toString() });
 }
 
 runMonitor().catch(err => {
