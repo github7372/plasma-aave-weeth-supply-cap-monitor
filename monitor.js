@@ -75,10 +75,12 @@ async function runMonitor() {
   const currentStr = currentSupply.toString();
 
   if (!previous) {
-    triggerAlert(`First run: totalSupply = ${ethers.formatUnits(currentSupply, 18)}`);
+    triggerAlert(`First run: totalSupply = ${ethers.formatUnits(currentSupply, 18)} ETH`);
     savePreviousData({ totalSupply: currentStr, firstSeen: new Date().toISOString() });
   } else if (previous.totalSupply !== currentStr) {
-    triggerAlert(`totalSupply changed! Old: ${previous.totalSupply}, New: ${currentStr}`);
+    const oldFormatted = ethers.formatUnits(previous.totalSupply, 18);
+    const newFormatted = ethers.formatUnits(currentSupply, 18);
+    triggerAlert(`totalSupply changed! Old: ${oldFormatted} ETH, New: ${newFormatted} ETH`);
     savePreviousData({
       totalSupply: currentStr,
       prevTotalSupply: previous.totalSupply,
